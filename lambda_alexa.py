@@ -211,6 +211,36 @@ def get_stats(intent, session):
     return build_response(session_attributes, build_speechlet_response(
         card_title, speech_output, reprompt_text, should_end_session))
 
+def get_trend(intent, session):
+
+    card_title = "Trend Info"
+    session_attributes = {}
+    should_end_session = False
+
+    txns = get_txns()
+    cat = {}
+    for txn in txns:
+        if txn['amount'] < 0:
+            txn_cat = txn['category']
+            month = txn['date'][:6]
+            cat[txn_cat] = cat.get(txn_cat, {})
+            cat[txn_cat][month] = cat[txn_cat].get(month,0) + txn['amount']
+
+    increase_trend = []
+
+    for c in cat:
+        cat[c] = sorted(cat[c].items(), key=lambda x:x[0])[-2:]
+
+        if len(cat[c]) > 1 and ((cat[c][1][1] - cat[c][0][1]) / cat[c][0][1] ) > .5:
+            increase_trend.append(c)
+
+    speech_output = 'You drastically increased spending on {}.'.format(', '.join(increase_trend))
+    speech_output = speech_output.replace('&', 'and')
+    reprompt_text = "You can ask me spending trend by saying, " \
+                    "what's the trend, trend, tell me trend, how is the trend, etc"
+    return build_response(session_attributes, build_speechlet_response(
+        card_title, speech_output, reprompt_text, should_end_session))
+
 def get_expense_for(intent, session):
 
     intent = intent['intent']
@@ -237,6 +267,8 @@ def get_expense_for(intent, session):
     else:
         speech_output = "I'm not sure if you have asked me expense for a " \
                         "category. Please try again."
+
+    speech_output = speech_output.replace('&', 'and')
 
     reprompt_text = "You can ask me expense of a particular category by saying, " \
                     "what's the expense for Uber or Lyft,"
@@ -277,6 +309,7 @@ def on_intent(intent_request, session):
     intent_fn_map_dict['ExpenseIntent'] = get_net_expenditure
     intent_fn_map_dict['CategoryExpenseIntent'] = get_expense_for
     intent_fn_map_dict['StatsIntent'] = get_stats
+    intent_fn_map_dict['TrendIntent'] = get_trend
     intent_fn_map_dict['AMAZON.HelpIntent'] = get_welcome_response
     intent_fn_map_dict['AMAZON.CancelIntent'] = handle_session_end_request
     intent_fn_map_dict['AMAZON.StopIntent'] = handle_session_end_request
