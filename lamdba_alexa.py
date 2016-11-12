@@ -131,13 +131,13 @@ def get_txns():
     content = urllib2.urlopen("http://intuit-mint.herokuapp.com/api/v1/user/transactions").read()
     return json.loads(content)
 
-def get_net_income():
+def get_net_income(intent, session):
     txns = get_txns()
     income = sum([txn['amount'] for txn in txns if txn['amount'] > 0])
 
     session_attributes = {}
-    card_title = "Good day!"
-    speech_output = "Your net income is {} dollars".format(income)
+    card_title = "Net Income"
+    speech_output = "Your net income is ${}".format(income)
 
     # If the user either does not reply to the welcome message or says something
     # that is not understood, they will be prompted again with this text.
@@ -147,17 +147,49 @@ def get_net_income():
     return build_response(session_attributes, build_speechlet_response(
         card_title, speech_output, reprompt_text, should_end_session))
 
-def get_net_expenditure():
+def get_net_expenditure(intent, session):
     txns = get_txns()
     expenditure = -sum([txn['amount'] for txn in txns if txn['amount'] < 0])
 
     session_attributes = {}
-    card_title = "Good day!"
+    card_title = "Net Expense"
 
-    speech_output = "Your net expenditure is {} dollars".format(expenditure)
+    speech_output = "Your net expenditure is ${}".format(expenditure)
     reprompt_text = "Please ask me by saying whats my net income"
 
     should_end_session = False
+    return build_response(session_attributes, build_speechlet_response(
+        card_title, speech_output, reprompt_text, should_end_session))
+
+def get_expense_for(intent, session):
+
+    intent = intent['intent']
+    card_title = intent['name']
+    session_attributes = {}
+    should_end_session = False
+
+    txns = get_txns()
+    if 'Category' in intent['slots']:
+        query = intent['slots']['Category']['value'].lower()
+        interested_txns = [txn['amount'] for txn in txns
+                                    if query in txn['category'].lower() or
+                                       query in txn['name'].lower()]
+        if len(interested_txns):
+            expenditure = -sum(interested_txns)
+            speech_output = "Your net expenditure for {} is ${}. " \
+                            "You can ask me expense of individual categories" \
+                            " by saying, what's the expense for Uber or Lyft " \
+                            "etc.".format(query.lower(), expenditure)
+        else:
+            speech_output = "I'm not sure if you have an expense with "\
+                            "category: {0}. Please try again.".format(query)
+
+    else:
+        speech_output = "I'm not sure if you have asked me expense for a " \
+                        "category. Please try again."
+
+    reprompt_text = "You can ask me expense of a particular category by saying, " \
+                    "what's the expense for Uber or Lyft,"
     return build_response(session_attributes, build_speechlet_response(
         card_title, speech_output, reprompt_text, should_end_session))
 
@@ -193,13 +225,14 @@ def on_intent(intent_request, session):
     intent_fn_map_dict = dict()
     intent_fn_map_dict['IncomeIntent'] = get_net_income
     intent_fn_map_dict['ExpenseIntent'] = get_net_expenditure
+    intent_fn_map_dict['CategoryExpenseIntent'] = get_expense_for
     intent_fn_map_dict['AMAZON.HelpIntent'] = get_welcome_response
     intent_fn_map_dict['AMAZON.CancelIntent'] = handle_session_end_request
     intent_fn_map_dict['AMAZON.StopIntent'] = handle_session_end_request
 
-
+    print(intent_name)
     if intent_name in intent_fn_map_dict:
-        return intent_fn_map_dict[intent_name]()
+        return intent_fn_map_dict[intent_name](intent_request, session)
     else:
         raise ValueError("Invalid intent")
     # Dispatch to your skill's intent handlers
