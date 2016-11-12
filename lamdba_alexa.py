@@ -161,6 +161,56 @@ def get_net_expenditure(intent, session):
     return build_response(session_attributes, build_speechlet_response(
         card_title, speech_output, reprompt_text, should_end_session))
 
+def get_type(flag):
+    if flag == 1:
+        return "You top sources of incomes are..."
+    else:
+        return "You spent the most on..."
+
+def get_stats_helper(mask):
+    cat = dict()
+    txns = get_txns()
+
+    for txn in txns:
+        if mask * txn['amount'] > 0:
+            txn_cat = txn['category']
+            cat[txn_cat] = cat.get(txn_cat, 0) + txn['amount']
+
+    stat = sorted(cat.items(), key=lambda x:x[1], reverse=(mask==1))[:3]
+    stat = [(s[0],int(mask*s[1])) for s in stat]
+    items = ''
+    for s in stat:
+        items += s[0]+' $'+str(s[1])+","
+
+    resp = '{} {}.'.format(get_type(mask), items[:len(items)-1])
+    print(resp)
+    return resp
+
+def get_stats(intent, session):
+    intent = intent['intent']
+    type_dict = dict(income=1, expenditure=-1, expense=-1, default=0)
+
+    card_title = intent['name']
+    session_attributes = {}
+    should_end_session = False
+
+    flag = type_dict['default']
+    print(intent)
+    if 'Type' in intent['slots'] and 'value' in intent['slots']['Type']:
+        flag = type_dict.get(intent['slots']['Type']['value'].lower(), 0)
+
+    if flag == 0:
+        speech_output = get_stats_helper(type_dict['income'])
+        speech_output += get_stats_helper(type_dict['expenditure'])
+    else:
+        speech_output = get_stats_helper(flag)
+
+    reprompt_text = "You can ask me statistics of your spending by saying, " \
+                    "my stats, get stats, get stats for income, get stats " \
+                    "for expenditure."
+    return build_response(session_attributes, build_speechlet_response(
+        card_title, speech_output, reprompt_text, should_end_session))
+
 def get_expense_for(intent, session):
 
     intent = intent['intent']
@@ -226,6 +276,7 @@ def on_intent(intent_request, session):
     intent_fn_map_dict['IncomeIntent'] = get_net_income
     intent_fn_map_dict['ExpenseIntent'] = get_net_expenditure
     intent_fn_map_dict['CategoryExpenseIntent'] = get_expense_for
+    intent_fn_map_dict['StatsIntent'] = get_stats
     intent_fn_map_dict['AMAZON.HelpIntent'] = get_welcome_response
     intent_fn_map_dict['AMAZON.CancelIntent'] = handle_session_end_request
     intent_fn_map_dict['AMAZON.StopIntent'] = handle_session_end_request
@@ -286,3 +337,6 @@ def lambda_handler(event, context):
         return on_intent(event['request'], event['session'])
     elif event['request']['type'] == "SessionEndedRequest":
         return on_session_ended(event['request'], event['session'])
+
+
+get_stats_helper(1)
