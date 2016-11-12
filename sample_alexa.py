@@ -8,8 +8,6 @@ http://amzn.to/1LGWsLG
 """
 
 from __future__ import print_function
-import urllib2
-import json
 
 # --------------- Helpers that build all of the responses ----------------------
 
@@ -125,24 +123,6 @@ def get_color_from_session(intent, session):
     return build_response(session_attributes, build_speechlet_response(
         intent['name'], speech_output, reprompt_text, should_end_session))
 
-def get_txns():
-    content = urllib2.urlopen("http://intuit-mint.herokuapp.com/api/v1/user/transactions").read()
-    return json.loads(content)
-
-def get_net_income():
-    txns = get_txns()
-    income = sum([txn['amount'] for txn in txns if txn['amount'] > 0])
-
-    s = "Your net income is {} dollars".format(income)
-    return s
-
-def get_net_expenditure():
-    txns = get_txns()
-    expenditure = -sum([txn['amount'] for txn in txns if txn['amount'] < 0])
-
-    s = "Your net expenditure is {} dollars".format(expenditure)
-    return s
-
 # --------------- Events ------------------
 
 def on_session_started(session_started_request, session):
@@ -172,8 +152,6 @@ def on_intent(intent_request, session):
     intent = intent_request['intent']
     intent_name = intent_request['intent']['name']
 
-    intent_dict = dict()
-    intent_dict['IncomeIntent'] = get_income
 
     # Dispatch to your skill's intent handlers
     if intent_name == "MyColorIsIntent":

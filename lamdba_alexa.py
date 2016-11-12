@@ -8,11 +8,13 @@ http://amzn.to/1LGWsLG
 """
 
 from __future__ import print_function
+import urllib2
+import json
 
 # --------------- Helpers that build all of the responses ----------------------
 
 def build_speechlet_response(title, output, reprompt_text, should_end_session):
-    return {
+    response = {
         'outputSpeech': {
             'type': 'PlainText',
             'text': output
@@ -30,6 +32,8 @@ def build_speechlet_response(title, output, reprompt_text, should_end_session):
         },
         'shouldEndSession': should_end_session
     }
+    print(response)
+    return response
 
 
 def build_response(session_attributes, speechlet_response):
@@ -123,6 +127,39 @@ def get_color_from_session(intent, session):
     return build_response(session_attributes, build_speechlet_response(
         intent['name'], speech_output, reprompt_text, should_end_session))
 
+def get_txns():
+    content = urllib2.urlopen("http://intuit-mint.herokuapp.com/api/v1/user/transactions").read()
+    return json.loads(content)
+
+def get_net_income():
+    txns = get_txns()
+    income = sum([txn['amount'] for txn in txns if txn['amount'] > 0])
+
+    session_attributes = {}
+    card_title = "Good day!"
+    speech_output = "Your net income is {} dollars".format(income)
+
+    # If the user either does not reply to the welcome message or says something
+    # that is not understood, they will be prompted again with this text.
+    reprompt_text = "Please ask me by saying whats my net income"
+
+    should_end_session = False
+    return build_response(session_attributes, build_speechlet_response(
+        card_title, speech_output, reprompt_text, should_end_session))
+
+def get_net_expenditure():
+    txns = get_txns()
+    expenditure = -sum([txn['amount'] for txn in txns if txn['amount'] < 0])
+
+    session_attributes = {}
+    card_title = "Good day!"
+
+    speech_output = "Your net expenditure is {} dollars".format(expenditure)
+    reprompt_text = "Please ask me by saying whats my net income"
+
+    should_end_session = False
+    return build_response(session_attributes, build_speechlet_response(
+        card_title, speech_output, reprompt_text, should_end_session))
 
 # --------------- Events ------------------
 
@@ -153,17 +190,29 @@ def on_intent(intent_request, session):
     intent = intent_request['intent']
     intent_name = intent_request['intent']['name']
 
-    # Dispatch to your skill's intent handlers
-    if intent_name == "MyColorIsIntent":
-        return set_color_in_session(intent, session)
-    elif intent_name == "WhatsMyColorIntent":
-        return get_color_from_session(intent, session)
-    elif intent_name == "AMAZON.HelpIntent":
-        return get_welcome_response()
-    elif intent_name == "AMAZON.CancelIntent" or intent_name == "AMAZON.StopIntent":
-        return handle_session_end_request()
+    intent_fn_map_dict = dict()
+    intent_fn_map_dict['IncomeIntent'] = get_net_income
+    intent_fn_map_dict['ExpenseIntent'] = get_net_expenditure
+    intent_fn_map_dict['AMAZON.HelpIntent'] = get_welcome_response
+    intent_fn_map_dict['AMAZON.CancelIntent'] = handle_session_end_request
+    intent_fn_map_dict['AMAZON.StopIntent'] = handle_session_end_request
+
+
+    if intent_name in intent_fn_map_dict:
+        return intent_fn_map_dict[intent_name]()
     else:
         raise ValueError("Invalid intent")
+    # Dispatch to your skill's intent handlers
+    # if intent_name == "MyColorIsIntent":
+    #     return set_color_in_session(intent, session)
+    # elif intent_name == "WhatsMyColorIntent":
+    #     return get_color_from_session(intent, session)
+    # elif intent_name == "AMAZON.HelpIntent":
+    #     return get_welcome_response()
+    # elif intent_name == "AMAZON.CancelIntent" or intent_name == "AMAZON.StopIntent":
+    #     return handle_session_end_request()
+    # else:
+
 
 
 def on_session_ended(session_ended_request, session):
