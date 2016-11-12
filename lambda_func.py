@@ -5,14 +5,14 @@ def get_txns():
 	content = urllib2.urlopen("http://intuit-mint.herokuapp.com/api/v1/user/transactions").read()
 	return json.loads(content)
 
-def net_income():
+def get_net_income():
 	txns = get_txns()
 	income = sum([txn['amount'] for txn in txns if txn['amount'] > 0])
 
 	s = "Your net income is {}".format(income)
 	return s
 
-def net_expenditure():
+def get_net_expenditure():
 	txns = get_txns()
 	expenditure = -sum([txn['amount'] for txn in txns if txn['amount'] < 0])
 
